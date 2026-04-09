@@ -1,0 +1,26 @@
+[build]
+  publish = "."
+  functions = "netlify/functions"
+
+# Redirect admin auth API
+[[redirects]]
+  from = "/.netlify/functions/*"
+  to   = "/.netlify/functions/:splat"
+  status = 200
+
+# Protect admin directory (no server-side auth here — auth is handled by the login page + serverless function)
+# The actual credential check is done server-side in admin-auth function
+[[headers]]
+  for = "/admin/*"
+  [headers.values]
+    X-Frame-Options    = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy    = "no-referrer"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options    = "SAMEORIGIN"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy    = "strict-origin-when-cross-origin"
+    Permissions-Policy = "geolocation=(), microphone=(), camera=()"

@@ -1,0 +1,11 @@
+{
+  "name": "fuelbite",
+  "version": "1.0.0",
+  "description": "FuelBite Restaurant Website",
+  "scripts": {
+    "dev": "netlify dev"
+  },
+  "devDependencies": {
+    "netlify-cli": "^17.0.0"
+  }
+}

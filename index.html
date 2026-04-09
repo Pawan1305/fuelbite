@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FuelBite – Fresh Bites, Fuelled Right</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+</head>
+<body>
+
+<!-- ===== NAVBAR ===== -->
+<nav class="navbar">
+  <div class="nav-brand">
+    <span class="brand-icon">🔥</span>
+    <span class="brand-name">FuelBite</span>
+  </div>
+  <div class="nav-links">
+    <a href="#menu" class="nav-link">Menu</a>
+    <a href="#about" class="nav-link">About</a>
+    <button class="cart-btn" onclick="toggleCart()">
+      <i class="fas fa-shopping-cart"></i>
+      <span class="cart-count" id="cartCount">0</span>
+    </button>
+    <a href="admin/login.html" class="admin-link"><i class="fas fa-lock"></i></a>
+  </div>
+</nav>
+
+<!-- ===== HERO ===== -->
+<section class="hero">
+  <div class="hero-content">
+    <h1 class="hero-title">Fresh Bites,<br /><span class="highlight">Fuelled Right</span></h1>
+    <p class="hero-sub">Hot meals crafted with love – order now and taste the difference.</p>
+    <a href="#menu" class="cta-btn">Explore Menu <i class="fas fa-arrow-down"></i></a>
+  </div>
+  <div class="hero-img">
+    <div class="food-globe">🍔</div>
+  </div>
+</section>
+
+<!-- ===== CATEGORY FILTER ===== -->
+<section id="menu" class="menu-section">
+  <h2 class="section-title">Our <span class="highlight">Menu</span></h2>
+  <div class="category-tabs" id="categoryTabs"></div>
+  <div class="menu-grid" id="menuGrid">
+    <div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i> Loading menu…</div>
+  </div>
+</section>
+
+<!-- ===== ABOUT ===== -->
+<section id="about" class="about-section">
+  <div class="about-inner">
+    <h2 class="section-title">Why <span class="highlight">FuelBite?</span></h2>
+    <div class="about-cards">
+      <div class="about-card">
+        <div class="about-icon">🌿</div>
+        <h3>Fresh Ingredients</h3>
+        <p>Sourced daily from local farms for maximum freshness.</p>
+      </div>
+      <div class="about-card">
+        <div class="about-icon">⚡</div>
+        <h3>Quick Service</h3>
+        <p>Your order ready and delivered in record time.</p>
+      </div>
+      <div class="about-card">
+        <div class="about-icon">💯</div>
+        <h3>100% Hygienic</h3>
+        <p>Prepared in certified kitchens with strict hygiene.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== FOOTER ===== -->
+<footer class="footer">
+  <div class="footer-content">
+    <span class="brand-name">🔥 FuelBite</span>
+    <p>© 2026 FuelBite. All rights reserved.</p>
+  </div>
+</footer>
+
+<!-- ===== CART SIDEBAR ===== -->
+<div class="cart-overlay" id="cartOverlay" onclick="toggleCart()"></div>
+<div class="cart-sidebar" id="cartSidebar">
+  <div class="cart-header">
+    <h3><i class="fas fa-shopping-cart"></i> Your Order</h3>
+    <button class="close-cart" onclick="toggleCart()"><i class="fas fa-times"></i></button>
+  </div>
+  <div class="cart-items" id="cartItems">
+    <div class="empty-cart">
+      <i class="fas fa-shopping-basket"></i>
+      <p>Your cart is empty</p>
+    </div>
+  </div>
+  <div class="cart-footer" id="cartFooter" style="display:none;">
+    <div class="cart-total">
+      <span>Total</span>
+      <span id="cartTotal">₹0</span>
+    </div>
+    <button class="checkout-btn" onclick="openCheckout()">
+      <i class="fas fa-bolt"></i> Pay Now
+    </button>
+  </div>
+</div>
+
+<!-- ===== CHECKOUT MODAL ===== -->
+<div class="modal-overlay" id="checkoutModal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeCheckout()"><i class="fas fa-times"></i></button>
+    <h2 class="modal-title"><i class="fas fa-receipt"></i> Checkout</h2>
+
+    <div class="form-group">
+      <label>Your Name *</label>
+      <input type="text" id="custName" placeholder="Enter your name" />
+    </div>
+    <div class="form-group">
+      <label>Phone Number *</label>
+      <input type="tel" id="custPhone" placeholder="+91 98765 43210" maxlength="13" />
+    </div>
+    <div class="form-group">
+      <label>Table / Delivery Address</label>
+      <input type="text" id="custAddress" placeholder="Table no. or address" />
+    </div>
+
+    <div class="order-summary" id="orderSummary"></div>
+
+    <div class="payment-section">
+      <h3><i class="fas fa-rupee-sign"></i> Payment</h3>
+      <!-- Mobile: UPI deep link | Desktop: QR code -->
+      <div id="paymentContent"></div>
+    </div>
+
+    <button class="confirm-btn" id="confirmBtn" onclick="confirmOrder()">
+      <i class="fas fa-check-circle"></i> Confirm &amp; Pay
+    </button>
+  </div>
+</div>
+
+<!-- ===== SUCCESS TOAST ===== -->
+<div class="toast" id="toast"></div>
+
+<script src="js/menu.js"></script>
+<script src="js/cart.js"></script>
+<script src="js/checkout.js"></script>
+</body>
+</html>

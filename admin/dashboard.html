@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard – FuelBite Admin</title>
+  <link rel="stylesheet" href="../css/admin.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+</head>
+<body>
+
+<!-- Guard: redirect if not logged in -->
+<script>
+if (!sessionStorage.getItem('fb_admin_token')) {
+  window.location.href = 'login.html';
+}
+</script>
+
+<!-- ===== NAVBAR ===== -->
+<nav class="admin-nav">
+  <span class="brand">🔥 FuelBite Admin</span>
+  <div class="nav-right">
+    <a href="../index.html" class="back-link"><i class="fas fa-arrow-left"></i> View Site</a>
+    <button class="btn-logout" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Logout</button>
+  </div>
+</nav>
+
+<!-- ===== MAIN CONTENT ===== -->
+<main class="admin-content">
+  <div class="admin-header">
+    <h1>Menu Items</h1>
+    <button class="btn-add" onclick="openAddModal()">
+      <i class="fas fa-plus"></i> Add Item
+    </button>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats-grid" id="statsGrid"></div>
+
+  <!-- Table -->
+  <div class="table-wrap">
+    <table class="items-table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Item</th>
+          <th>Category</th>
+          <th>Price</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="menuTableBody"></tbody>
+    </table>
+  </div>
+</main>
+
+<!-- ===== ADD / EDIT MODAL ===== -->
+<div class="modal-overlay" id="itemModal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal()"><i class="fas fa-times"></i></button>
+    <h2 id="modalTitle">Add New Item</h2>
+
+    <div class="form-group">
+      <label>Item Name *</label>
+      <input type="text" id="fName" placeholder="e.g. Classic Burger" />
+    </div>
+    <div class="form-group">
+      <label>Category *</label>
+      <select id="fCategory">
+        <option value="">Select category…</option>
+        <option>Burgers</option>
+        <option>Sides</option>
+        <option>Drinks</option>
+        <option>Desserts</option>
+        <option>Specials</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Price (₹) *</label>
+      <input type="number" id="fPrice" placeholder="149" min="1" />
+    </div>
+    <div class="form-group">
+      <label>Emoji Icon</label>
+      <input type="text" id="fEmoji" placeholder="🍔" maxlength="4" />
+    </div>
+    <div class="form-group">
+      <label>Description</label>
+      <textarea id="fDesc" rows="2" placeholder="Short description…"></textarea>
+    </div>
+    <div class="form-group">
+      <label>Availability</label>
+      <select id="fAvailable">
+        <option value="true">Available</option>
+        <option value="false">Unavailable</option>
+      </select>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal()">Cancel</button>
+      <button class="btn-save" onclick="saveItem()"><i class="fas fa-save"></i> Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== TOAST ===== -->
+<div class="toast" id="toast"></div>
+
+<script>
+/* ========================================
+   Admin Dashboard JS
+   ======================================== */
+
+let editingId = null;
+
+function getMenuItems() {
+  try {
+    const s = localStorage.getItem('fuelbite_menu');
+    if (s) return JSON.parse(s);
+  } catch (e) {}
+  return [];
+}
+
+function saveMenuItems(items) {
+  localStorage.setItem('fuelbite_menu', JSON.stringify(items));
+}
+
+function logout() {
+  sessionStorage.removeItem('fb_admin_token');
+  window.location.href = 'login.html';
+}
+
+// ===== STATS =====
+function renderStats(items) {
+  const el = document.getElementById('statsGrid');
+  if (!el) return;
+  const avail = items.filter(i => i.available).length;
+  const cats = new Set(items.map(i => i.category)).size;
+  el.innerHTML = `
+    <div class="stat-card"><span class="stat-label">Total Items</span><span class="stat-value">${items.length}</span></div>
+    <div class="stat-card"><span class="stat-label">Available</span><span class="stat-value">${avail}</span></div>
+    <div class="stat-card"><span class="stat-label">Unavailable</span><span class="stat-value">${items.length - avail}</span></div>
+    <div class="stat-card"><span class="stat-label">Categories</span><span class="stat-value">${cats}</span></div>
+  `;
+}
+
+// ===== TABLE =====
+function renderTable() {
+  const items = getMenuItems();
+  renderStats(items);
+  const tbody = document.getElementById('menuTableBody');
+  if (!tbody) return;
+  if (items.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:40px">No menu items yet. Click "Add Item" to start.</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = items.map((item, idx) => `
+    <tr>
+      <td style="color:var(--text-muted)">${idx + 1}</td>
+      <td>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:1.4rem">${item.emoji || '🍽️'}</span>
+          <div>
+            <div style="font-weight:600">${escHtml(item.name)}</div>
+            <div style="font-size:0.78rem;color:var(--text-muted)">${escHtml(item.desc || '')}</div>
+          </div>
+        </div>
+      </td>
+      <td>${escHtml(item.category)}</td>
+      <td style="font-weight:700;color:var(--primary)">₹${item.price}</td>
+      <td>
+        <span class="badge ${item.available ? 'badge-available' : 'badge-unavailable'}">
+          ${item.available ? 'Available' : 'Unavailable'}
+        </span>
+      </td>
+      <td>
+        <div class="action-btns">
+          <button class="btn-edit" onclick="openEditModal(${item.id})"><i class="fas fa-pen"></i> Edit</button>
+          <button class="btn-toggle" onclick="toggleAvailable(${item.id})">
+            ${item.available ? '<i class="fas fa-eye-slash"></i> Hide' : '<i class="fas fa-eye"></i> Show'}
+          </button>
+          <button class="btn-delete" onclick="deleteItem(${item.id})"><i class="fas fa-trash"></i></button>
+        </div>
+      </td>
+    </tr>`).join('');
+}
+
+function escHtml(str) {
+  const d = document.createElement('div');
+  d.appendChild(document.createTextNode(str || ''));
+  return d.innerHTML;
+}
+
+// ===== MODAL =====
+function openAddModal() {
+  editingId = null;
+  document.getElementById('modalTitle').textContent = 'Add New Item';
+  document.getElementById('fName').value = '';
+  document.getElementById('fCategory').value = '';
+  document.getElementById('fPrice').value = '';
+  document.getElementById('fEmoji').value = '';
+  document.getElementById('fDesc').value = '';
+  document.getElementById('fAvailable').value = 'true';
+  document.getElementById('itemModal').classList.add('active');
+}
+
+function openEditModal(id) {
+  editingId = id;
+  const items = getMenuItems();
+  const item = items.find(i => i.id === id);
+  if (!item) return;
+  document.getElementById('modalTitle').textContent = 'Edit Item';
+  document.getElementById('fName').value = item.name;
+  document.getElementById('fCategory').value = item.category;
+  document.getElementById('fPrice').value = item.price;
+  document.getElementById('fEmoji').value = item.emoji || '';
+  document.getElementById('fDesc').value = item.desc || '';
+  document.getElementById('fAvailable').value = item.available ? 'true' : 'false';
+  document.getElementById('itemModal').classList.add('active');
+}
+
+function closeModal() {
+  document.getElementById('itemModal').classList.remove('active');
+}
+
+function saveItem() {
+  const name     = document.getElementById('fName').value.trim();
+  const category = document.getElementById('fCategory').value;
+  const price    = parseInt(document.getElementById('fPrice').value);
+  const emoji    = document.getElementById('fEmoji').value.trim() || '🍽️';
+  const desc     = document.getElementById('fDesc').value.trim();
+  const available = document.getElementById('fAvailable').value === 'true';
+
+  if (!name) { showToast('Item name is required.', 'error'); return; }
+  if (!category) { showToast('Please select a category.', 'error'); return; }
+  if (!price || price < 1) { showToast('Please enter a valid price.', 'error'); return; }
+
+  const items = getMenuItems();
+
+  if (editingId !== null) {
+    const idx = items.findIndex(i => i.id === editingId);
+    if (idx !== -1) {
+      items[idx] = { ...items[idx], name, category, price, emoji, desc, available };
+    }
+    showToast('Item updated!', 'success');
+  } else {
+    const newId = items.length > 0 ? Math.max(...items.map(i => i.id)) + 1 : 1;
+    items.push({ id: newId, name, category, price, emoji, desc, available });
+    showToast('Item added!', 'success');
+  }
+
+  saveMenuItems(items);
+  closeModal();
+  renderTable();
+}
+
+function toggleAvailable(id) {
+  const items = getMenuItems();
+  const item = items.find(i => i.id === id);
+  if (!item) return;
+  item.available = !item.available;
+  saveMenuItems(items);
+  renderTable();
+  showToast(`${item.name} marked as ${item.available ? 'available' : 'unavailable'}.`, 'success');
+}
+
+function deleteItem(id) {
+  const items = getMenuItems();
+  const item = items.find(i => i.id === id);
+  if (!item) return;
+  if (!confirm(`Delete "${item.name}"? This cannot be undone.`)) return;
+  saveMenuItems(items.filter(i => i.id !== id));
+  renderTable();
+  showToast('Item deleted.', 'success');
+}
+
+function showToast(msg, type = '') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = `toast ${type} show`;
+  setTimeout(() => { t.className = 'toast'; }, 3000);
+}
+
+// Close modal on overlay click
+document.getElementById('itemModal').addEventListener('click', function(e) {
+  if (e.target === this) closeModal();
+});
+
+// Init
+renderTable();
+</script>
+</body>
+</html>
