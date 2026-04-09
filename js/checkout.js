@@ -6,7 +6,7 @@
  * is generated client-side for performance.
  */
 
-const UPI_ID   = 'fuelbite@upi';   // ← Replace with your actual UPI ID
+const UPI_ID   = 'pawan.punnu.k@oksbi';
 const UPI_NAME = 'FuelBite';
 
 // WhatsApp notification is sent via Netlify serverless function
