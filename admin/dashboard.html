@@ -278,12 +278,21 @@ function renderOrders() {
     btn.classList.toggle('active', btn.dataset.filter === orderFilter);
   });
 
+  const today     = new Date().toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' });
   const pending   = all.filter(o => o.status === 'pending').length;
   const completed = all.filter(o => o.status === 'completed').length;
+  const todayEarned = all
+    .filter(o => o.status === 'completed' && o.orderedAt && o.orderedAt.startsWith(today))
+    .reduce((sum, o) => sum + (o.total || 0), 0);
+  const totalEarned = all
+    .filter(o => o.status === 'completed')
+    .reduce((sum, o) => sum + (o.total || 0), 0);
   document.getElementById('orderStats').innerHTML = `
     <div class="stat-card"><span class="stat-label">Total Orders</span><span class="stat-value">${all.length}</span></div>
     <div class="stat-card"><span class="stat-label">Pending</span><span class="stat-value" style="color:#f59e0b">${pending}</span></div>
     <div class="stat-card"><span class="stat-label">Completed</span><span class="stat-value" style="color:var(--success)">${completed}</span></div>
+    <div class="stat-card"><span class="stat-label">Earned Today</span><span class="stat-value" style="color:var(--secondary)">₹${todayEarned}</span></div>
+    <div class="stat-card"><span class="stat-label">Total Earned</span><span class="stat-value" style="color:var(--primary)">₹${totalEarned}</span></div>
   `;
 
   const tbody = document.getElementById('ordersTableBody');
