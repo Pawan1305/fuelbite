@@ -148,19 +148,19 @@ function sendOrderViaWhatsApp() {
     .map(i => `• ${i.name} ×${i.qty}  =  ₹${i.price * i.qty}`)
     .join('\n');
   const message = [
-    `🔥 *New FuelBite Order – ${order.id}*`,
+    `*New FuelBite Order – ${order.id}*`,
     ``,
-    `👤 *Name:* ${name}`,
-    `📱 *Phone:* ${phone}`,
-    `📍 *Table/Address:* ${orderData.address}`,
+    `*Name:* ${name}`,
+    `*Phone:* ${phone}`,
+    `*Table/Address:* ${orderData.address}`,
     ``,
-    `🛒 *Items:*`,
+    `*Items:*`,
     itemLines,
     ``,
-    `💰 *Total: ₹${orderData.total}*`,
-    `🕐 ${orderData.orderedAt}`,
+    `*Total: ₹${orderData.total}*`,
+    `*Ordered At:* ${orderData.orderedAt}`,
     ``,
-    `📸 *Please also send a screenshot of your payment confirmation.*`
+    `*Please also send a screenshot of your payment confirmation.*`
   ].join('\n');
 
   // Play success sound then close & redirect
