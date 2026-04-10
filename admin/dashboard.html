@@ -27,32 +27,76 @@ if (!sessionStorage.getItem('fb_admin_token')) {
 
 <!-- ===== MAIN CONTENT ===== -->
 <main class="admin-content">
-  <div class="admin-header">
-    <h1>Menu Items</h1>
-    <button class="btn-add" onclick="openAddModal()">
-      <i class="fas fa-plus"></i> Add Item
+
+  <!-- Tab Navigation -->
+  <div class="admin-tabs">
+    <button class="admin-tab active" id="tabMenu" onclick="switchTab('menu')">
+      <i class="fas fa-utensils"></i> Menu Items
+    </button>
+    <button class="admin-tab" id="tabOrders" onclick="switchTab('orders')">
+      <i class="fas fa-receipt"></i> Orders
+      <span class="order-badge" id="pendingCount" style="display:none">0</span>
     </button>
   </div>
 
-  <!-- Stats -->
-  <div class="stats-grid" id="statsGrid"></div>
-
-  <!-- Table -->
-  <div class="table-wrap">
-    <table class="items-table">
-      <thead>
-        <tr>
-          <th>#</th>
-          <th>Item</th>
-          <th>Category</th>
-          <th>Price</th>
-          <th>Status</th>
-          <th>Actions</th>
-        </tr>
-      </thead>
-      <tbody id="menuTableBody"></tbody>
-    </table>
+  <!-- ===== MENU SECTION ===== -->
+  <div id="sectionMenu">
+    <div class="admin-header">
+      <h1>Menu Items</h1>
+      <button class="btn-add" onclick="openAddModal()">
+        <i class="fas fa-plus"></i> Add Item
+      </button>
+    </div>
+    <div class="stats-grid" id="statsGrid"></div>
+    <div class="table-wrap">
+      <table class="items-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Item</th>
+            <th>Category</th>
+            <th>Price</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="menuTableBody"></tbody>
+      </table>
+    </div>
   </div>
+
+  <!-- ===== ORDERS SECTION ===== -->
+  <div id="sectionOrders" style="display:none">
+    <div class="admin-header">
+      <h1>Orders</h1>
+      <button class="btn-add" onclick="renderOrders()" style="background:var(--bg3);border:1px solid var(--border);color:var(--text-muted)">
+        <i class="fas fa-sync-alt"></i> Refresh
+      </button>
+    </div>
+    <div class="stats-grid" id="orderStats"></div>
+    <div class="order-filters">
+      <button class="order-filter-btn active" data-filter="all" onclick="setOrderFilter('all')">All</button>
+      <button class="order-filter-btn" data-filter="pending" onclick="setOrderFilter('pending')">⏳ Pending</button>
+      <button class="order-filter-btn" data-filter="completed" onclick="setOrderFilter('completed')">✅ Completed</button>
+    </div>
+    <div class="table-wrap">
+      <table class="items-table">
+        <thead>
+          <tr>
+            <th>Order ID</th>
+            <th>Customer</th>
+            <th>Address</th>
+            <th>Items</th>
+            <th>Total</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="ordersTableBody"></tbody>
+      </table>
+    </div>
+  </div>
+
 </main>
 
 <!-- ===== ADD / EDIT MODAL ===== -->
@@ -112,7 +156,10 @@ if (!sessionStorage.getItem('fb_admin_token')) {
    ======================================== */
 
 let editingId = null;
+let currentTab = 'menu';
+let orderFilter = 'all';
 
+// ===== HELPERS =====
 function getMenuItems() {
   try {
     const s = localStorage.getItem('fuelbite_menu');
@@ -120,22 +167,58 @@ function getMenuItems() {
   } catch (e) {}
   return [];
 }
-
 function saveMenuItems(items) {
   localStorage.setItem('fuelbite_menu', JSON.stringify(items));
 }
-
+function getOrders() {
+  try { return JSON.parse(localStorage.getItem('fuelbite_orders') || '[]'); } catch(e) { return []; }
+}
+function saveOrders(orders) {
+  localStorage.setItem('fuelbite_orders', JSON.stringify(orders));
+}
 function logout() {
   sessionStorage.removeItem('fb_admin_token');
   window.location.href = 'login.html';
 }
+function escHtml(str) {
+  const d = document.createElement('div');
+  d.appendChild(document.createTextNode(str || ''));
+  return d.innerHTML;
+}
+function showToast(msg, type = '') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = `toast ${type} show`;
+  setTimeout(() => { t.className = 'toast'; }, 3000);
+}
 
-// ===== STATS =====
+// ===== TAB SWITCHING =====
+function switchTab(tab) {
+  currentTab = tab;
+  document.getElementById('sectionMenu').style.display   = tab === 'menu'   ? 'block' : 'none';
+  document.getElementById('sectionOrders').style.display = tab === 'orders' ? 'block' : 'none';
+  document.getElementById('tabMenu').classList.toggle('active', tab === 'menu');
+  document.getElementById('tabOrders').classList.toggle('active', tab === 'orders');
+  if (tab === 'orders') renderOrders();
+  if (tab === 'menu')   renderTable();
+}
+
+// ===== PENDING COUNT (badge on tab) =====
+function updatePendingCount() {
+  const pending = getOrders().filter(o => o.status === 'pending').length;
+  const badge = document.getElementById('pendingCount');
+  if (badge) {
+    badge.textContent = pending;
+    badge.style.display = pending > 0 ? 'inline-flex' : 'none';
+  }
+}
+
+// ===== MENU STATS =====
 function renderStats(items) {
   const el = document.getElementById('statsGrid');
   if (!el) return;
   const avail = items.filter(i => i.available).length;
-  const cats = new Set(items.map(i => i.category)).size;
+  const cats  = new Set(items.map(i => i.category)).size;
   el.innerHTML = `
     <div class="stat-card"><span class="stat-label">Total Items</span><span class="stat-value">${items.length}</span></div>
     <div class="stat-card"><span class="stat-label">Available</span><span class="stat-value">${avail}</span></div>
@@ -144,7 +227,7 @@ function renderStats(items) {
   `;
 }
 
-// ===== TABLE =====
+// ===== MENU TABLE =====
 function renderTable() {
   const items = getMenuItems();
   renderStats(items);
@@ -185,21 +268,169 @@ function renderTable() {
     </tr>`).join('');
 }
 
-function escHtml(str) {
-  const d = document.createElement('div');
-  d.appendChild(document.createTextNode(str || ''));
-  return d.innerHTML;
+// ===== ORDERS =====
+function renderOrders() {
+  updatePendingCount();
+  const all      = getOrders();
+  const filtered = orderFilter === 'all' ? all : all.filter(o => o.status === orderFilter);
+
+  document.querySelectorAll('.order-filter-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.filter === orderFilter);
+  });
+
+  const pending   = all.filter(o => o.status === 'pending').length;
+  const completed = all.filter(o => o.status === 'completed').length;
+  document.getElementById('orderStats').innerHTML = `
+    <div class="stat-card"><span class="stat-label">Total Orders</span><span class="stat-value">${all.length}</span></div>
+    <div class="stat-card"><span class="stat-label">Pending</span><span class="stat-value" style="color:#f59e0b">${pending}</span></div>
+    <div class="stat-card"><span class="stat-label">Completed</span><span class="stat-value" style="color:var(--success)">${completed}</span></div>
+  `;
+
+  const tbody = document.getElementById('ordersTableBody');
+  if (!tbody) return;
+  if (filtered.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:40px">${
+      orderFilter === 'pending' ? 'No pending orders. All caught up! 🎉' : 'No orders yet.'
+    }</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = filtered.map(order => {
+    const summary   = order.items.map(i => `${escHtml(i.name)} ×${i.qty}`).join(', ');
+    const isPending = order.status === 'pending';
+    return `
+      <tr>
+        <td style="font-weight:700;color:var(--primary);white-space:nowrap">${escHtml(order.id)}</td>
+        <td>
+          <div style="font-weight:600">${escHtml(order.customerName)}</div>
+          <div style="font-size:0.78rem;color:var(--text-muted)">${escHtml(order.customerPhone)}</div>
+        </td>
+        <td style="font-size:0.82rem;color:var(--text-muted);max-width:100px">${escHtml(order.address || 'N/A')}</td>
+        <td style="font-size:0.82rem;max-width:160px;line-height:1.5">${summary}</td>
+        <td style="font-weight:700;color:var(--primary);white-space:nowrap">₹${order.total}</td>
+        <td>
+          <span class="badge ${isPending ? 'badge-pending' : 'badge-done'}">
+            ${isPending ? '⏳ Pending' : '✅ Done'}
+          </span>
+          <div style="font-size:0.7rem;color:var(--text-muted);margin-top:4px;white-space:nowrap">${escHtml(order.orderedAt)}</div>
+        </td>
+        <td>
+          <div class="action-btns" style="flex-direction:column;gap:6px;align-items:flex-start">
+            ${isPending ? `<button class="btn-toggle" onclick="markCompleted('${order.id}')"><i class="fas fa-check"></i> Mark Done</button>` : ''}
+            <button class="btn-edit" onclick="printBill('${order.id}')"><i class="fas fa-print"></i> Print Bill</button>
+          </div>
+        </td>
+      </tr>`;
+  }).join('');
 }
 
-// ===== MODAL =====
+function setOrderFilter(f) {
+  orderFilter = f;
+  renderOrders();
+}
+
+function markCompleted(orderId) {
+  const orders = getOrders();
+  const order  = orders.find(o => o.id === orderId);
+  if (!order) return;
+  order.status = 'completed';
+  saveOrders(orders);
+  renderOrders();
+  showToast(`Order ${orderId} marked as completed ✅`, 'success');
+}
+
+// ===== PRINT BILL =====
+function printBill(orderId) {
+  const order = getOrders().find(o => o.id === orderId);
+  if (!order) return;
+
+  const itemRows = order.items.map(item => `
+    <tr>
+      <td>${escHtml(item.name)}</td>
+      <td style="text-align:center">${item.qty}</td>
+      <td style="text-align:right">&#8377;${item.price}</td>
+      <td style="text-align:right">&#8377;${item.price * item.qty}</td>
+    </tr>`).join('');
+
+  const billHTML = `<!DOCTYPE html>
+<html><head>
+  <meta charset="UTF-8"/>
+  <title>Bill – ${order.id}</title>
+  <style>
+    * { box-sizing:border-box; margin:0; padding:0; }
+    body { font-family:'Courier New',monospace; width:320px; margin:0 auto; padding:20px 16px; font-size:13px; color:#111; background:#fff; }
+    .center  { text-align:center; }
+    .brand   { font-size:20px; font-weight:bold; letter-spacing:3px; }
+    .divider { border:none; border-top:1px dashed #555; margin:10px 0; }
+    table    { width:100%; border-collapse:collapse; }
+    th { font-size:11px; text-transform:uppercase; letter-spacing:0.5px; border-bottom:1px solid #333; padding:4px 2px; text-align:left; }
+    td { padding:5px 2px; vertical-align:top; font-size:12px; }
+    .total-row td { font-weight:bold; font-size:14px; border-top:1px dashed #333; padding-top:8px; }
+    .info    { font-size:12px; line-height:2; }
+    .footer  { text-align:center; font-size:11px; margin-top:12px; color:#555; line-height:1.8; }
+    .print-btn { display:block; margin:16px auto 0; padding:8px 24px; font-size:13px; cursor:pointer; background:#ff6b35; color:#fff; border:none; border-radius:6px; font-family:inherit; }
+    @media print { .print-btn { display:none; } body { width:100%; } }
+  </style>
+</head>
+<body>
+  <div class="center">
+    <div class="brand">&#128293; FUELBITE</div>
+    <div style="font-size:11px;margin-top:3px;letter-spacing:1px">FRESH BITES, FUELLED RIGHT</div>
+  </div>
+  <hr class="divider"/>
+  <div class="info">
+    <b>Order&nbsp;#:</b> ${order.id}<br/>
+    <b>Date&nbsp;&nbsp;&nbsp;:</b> ${escHtml(order.orderedAt)}<br/>
+    <b>Customer:</b> ${escHtml(order.customerName)}<br/>
+    <b>Phone&nbsp;&nbsp;:</b> ${escHtml(order.customerPhone)}<br/>
+    <b>Address :</b> ${escHtml(order.address || 'N/A')}
+  </div>
+  <hr class="divider"/>
+  <table>
+    <thead>
+      <tr>
+        <th>Item</th>
+        <th style="text-align:center">Qty</th>
+        <th style="text-align:right">Rate</th>
+        <th style="text-align:right">Amt</th>
+      </tr>
+    </thead>
+    <tbody>${itemRows}</tbody>
+    <tfoot>
+      <tr class="total-row">
+        <td colspan="3">GRAND TOTAL</td>
+        <td style="text-align:right">&#8377;${order.total}</td>
+      </tr>
+    </tfoot>
+  </table>
+  <hr class="divider"/>
+  <div class="center" style="font-size:12px;line-height:2">
+    Payment Mode: UPI&nbsp;&nbsp;|&nbsp;&nbsp;Status: ${order.status === 'completed' ? '&#10003; Paid' : 'Pending'}
+  </div>
+  <hr class="divider"/>
+  <div class="footer">
+    &#9733; Thank you for dining with us! &#9733;<br/>
+    Visit us again soon &#128293;<br/>
+    <span style="font-size:10px">FuelBite &copy; 2026</span>
+  </div>
+  <button class="print-btn" onclick="window.print()">&#128438; Print Bill</button>
+  <script>window.onload=function(){window.print();}<\/script>
+</body></html>`;
+
+  const win = window.open('', '_blank', 'width=420,height=640');
+  win.document.write(billHTML);
+  win.document.close();
+}
+
+// ===== MENU MODAL =====
 function openAddModal() {
   editingId = null;
   document.getElementById('modalTitle').textContent = 'Add New Item';
-  document.getElementById('fName').value = '';
+  document.getElementById('fName').value     = '';
   document.getElementById('fCategory').value = '';
-  document.getElementById('fPrice').value = '';
-  document.getElementById('fEmoji').value = '';
-  document.getElementById('fDesc').value = '';
+  document.getElementById('fPrice').value    = '';
+  document.getElementById('fEmoji').value    = '';
+  document.getElementById('fDesc').value     = '';
   document.getElementById('fAvailable').value = 'true';
   document.getElementById('itemModal').classList.add('active');
 }
@@ -207,14 +438,14 @@ function openAddModal() {
 function openEditModal(id) {
   editingId = id;
   const items = getMenuItems();
-  const item = items.find(i => i.id === id);
+  const item  = items.find(i => i.id === id);
   if (!item) return;
   document.getElementById('modalTitle').textContent = 'Edit Item';
-  document.getElementById('fName').value = item.name;
+  document.getElementById('fName').value     = item.name;
   document.getElementById('fCategory').value = item.category;
-  document.getElementById('fPrice').value = item.price;
-  document.getElementById('fEmoji').value = item.emoji || '';
-  document.getElementById('fDesc').value = item.desc || '';
+  document.getElementById('fPrice').value    = item.price;
+  document.getElementById('fEmoji').value    = item.emoji || '';
+  document.getElementById('fDesc').value     = item.desc  || '';
   document.getElementById('fAvailable').value = item.available ? 'true' : 'false';
   document.getElementById('itemModal').classList.add('active');
 }
@@ -224,24 +455,22 @@ function closeModal() {
 }
 
 function saveItem() {
-  const name     = document.getElementById('fName').value.trim();
-  const category = document.getElementById('fCategory').value;
-  const price    = parseInt(document.getElementById('fPrice').value);
-  const emoji    = document.getElementById('fEmoji').value.trim() || '🍽️';
-  const desc     = document.getElementById('fDesc').value.trim();
+  const name      = document.getElementById('fName').value.trim();
+  const category  = document.getElementById('fCategory').value;
+  const price     = parseInt(document.getElementById('fPrice').value);
+  const emoji     = document.getElementById('fEmoji').value.trim() || '🍽️';
+  const desc      = document.getElementById('fDesc').value.trim();
   const available = document.getElementById('fAvailable').value === 'true';
 
-  if (!name) { showToast('Item name is required.', 'error'); return; }
-  if (!category) { showToast('Please select a category.', 'error'); return; }
-  if (!price || price < 1) { showToast('Please enter a valid price.', 'error'); return; }
+  if (!name)              { showToast('Item name is required.', 'error'); return; }
+  if (!category)          { showToast('Please select a category.', 'error'); return; }
+  if (!price || price < 1){ showToast('Please enter a valid price.', 'error'); return; }
 
   const items = getMenuItems();
 
   if (editingId !== null) {
     const idx = items.findIndex(i => i.id === editingId);
-    if (idx !== -1) {
-      items[idx] = { ...items[idx], name, category, price, emoji, desc, available };
-    }
+    if (idx !== -1) items[idx] = { ...items[idx], name, category, price, emoji, desc, available };
     showToast('Item updated!', 'success');
   } else {
     const newId = items.length > 0 ? Math.max(...items.map(i => i.id)) + 1 : 1;
@@ -256,7 +485,7 @@ function saveItem() {
 
 function toggleAvailable(id) {
   const items = getMenuItems();
-  const item = items.find(i => i.id === id);
+  const item  = items.find(i => i.id === id);
   if (!item) return;
   item.available = !item.available;
   saveMenuItems(items);
@@ -266,19 +495,12 @@ function toggleAvailable(id) {
 
 function deleteItem(id) {
   const items = getMenuItems();
-  const item = items.find(i => i.id === id);
+  const item  = items.find(i => i.id === id);
   if (!item) return;
   if (!confirm(`Delete "${item.name}"? This cannot be undone.`)) return;
   saveMenuItems(items.filter(i => i.id !== id));
   renderTable();
   showToast('Item deleted.', 'success');
-}
-
-function showToast(msg, type = '') {
-  const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.className = `toast ${type} show`;
-  setTimeout(() => { t.className = 'toast'; }, 3000);
 }
 
 // Close modal on overlay click
@@ -288,6 +510,12 @@ document.getElementById('itemModal').addEventListener('click', function(e) {
 
 // Init
 renderTable();
+updatePendingCount();
+// Auto-refresh pending count every 30 s
+setInterval(() => {
+  if (currentTab === 'orders') renderOrders();
+  updatePendingCount();
+}, 30000);
 </script>
 </body>
 </html>

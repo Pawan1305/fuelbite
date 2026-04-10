@@ -387,7 +387,7 @@ body {
 
 .confirm-btn {
   width: 100%; padding: 14px; margin-top: 20px;
-  background: var(--success); color: #fff; border: none;
+  background: #25d366; color: #fff; border: none;
   border-radius: var(--radius); font-size: 1rem; font-weight: 600;
   cursor: pointer; transition: opacity var(--transition);
   display: flex; align-items: center; justify-content: center; gap: 8px;

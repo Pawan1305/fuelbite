@@ -8,9 +8,7 @@
 
 const UPI_ID   = 'pawan.punnu.k@oksbi';
 const UPI_NAME = 'FuelBite';
-
-// WhatsApp notification is sent via Netlify serverless function
-// Configure WHATSAPP_PHONE and CALLMEBOT_API_KEY in Netlify env vars
+const OWNER_WHATSAPP = '919053346151'; // ← Replace with owner's WhatsApp number (country code + number, no + or spaces)
 
 function isMobile() {
   return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
@@ -86,7 +84,44 @@ function renderPayment() {
   }
 }
 
-async function confirmOrder() {
+/** Save order to localStorage so admin can track it */
+function saveOrder(orderData) {
+  let orders = [];
+  try { orders = JSON.parse(localStorage.getItem('fuelbite_orders') || '[]'); } catch(e) {}
+  const order = {
+    ...orderData,
+    id: 'FB' + Date.now().toString().slice(-6),
+    status: 'pending'
+  };
+  orders.unshift(order); // newest first
+  localStorage.setItem('fuelbite_orders', JSON.stringify(orders));
+  return order;
+}
+
+/** Payment success sound – three rising tones via Web Audio API (no audio file needed) */
+function playPaymentSound() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    [{ f: 660, t: 0 }, { f: 880, t: 0.15 }, { f: 1320, t: 0.3 }].forEach(({ f, t }) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = 'sine';
+      osc.frequency.value = f;
+      gain.gain.setValueAtTime(0.28, ctx.currentTime + t);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + t + 0.28);
+      osc.start(ctx.currentTime + t);
+      osc.stop(ctx.currentTime + t + 0.3);
+    });
+  } catch(e) { /* audio not supported */ }
+}
+
+/**
+ * sendOrderViaWhatsApp – validates form, saves order, plays sound,
+ * then opens WhatsApp with full order details + payment screenshot reminder.
+ */
+function sendOrderViaWhatsApp() {
   const name    = document.getElementById('custName').value.trim();
   const phone   = document.getElementById('custPhone').value.trim();
   const address = document.getElementById('custAddress').value.trim();
@@ -97,10 +132,6 @@ async function confirmOrder() {
     return;
   }
 
-  const btn = document.getElementById('confirmBtn');
-  btn.disabled = true;
-  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending…';
-
   const orderData = {
     customerName: name,
     customerPhone: phone,
@@ -110,33 +141,38 @@ async function confirmOrder() {
     orderedAt: new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })
   };
 
-  try {
-    // Send WhatsApp notification via Netlify serverless function
-    const res = await fetch('/.netlify/functions/notify-order', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(orderData)
-    });
+  const order = saveOrder(orderData);
 
-    if (res.ok) {
-      closeCheckout();
-      clearCart();
-      showToast('Order placed! Check WhatsApp for confirmation. 🎉', 'success');
-    } else {
-      // Still mark success from user side even if WA fails
-      closeCheckout();
-      clearCart();
-      showToast('Order placed! Thank you, ' + name + '! 🎉', 'success');
-    }
-  } catch (err) {
-    // Network error – still show success to user, order is taken
-    closeCheckout();
-    clearCart();
-    showToast('Order placed! Thank you, ' + name + '! 🎉', 'success');
-  } finally {
-    btn.disabled = false;
-    btn.innerHTML = '<i class="fas fa-check-circle"></i> Confirm & Pay';
-  }
+  // Build WhatsApp message
+  const itemLines = orderData.items
+    .map(i => `• ${i.name} ×${i.qty}  =  ₹${i.price * i.qty}`)
+    .join('\n');
+  const message = [
+    `🔥 *New FuelBite Order – ${order.id}*`,
+    ``,
+    `👤 *Name:* ${name}`,
+    `📱 *Phone:* ${phone}`,
+    `📍 *Table/Address:* ${orderData.address}`,
+    ``,
+    `🛒 *Items:*`,
+    itemLines,
+    ``,
+    `💰 *Total: ₹${orderData.total}*`,
+    `🕐 ${orderData.orderedAt}`,
+    ``,
+    `📸 *Please also send a screenshot of your payment confirmation.*`
+  ].join('\n');
+
+  // Play success sound then close & redirect
+  playPaymentSound();
+  closeCheckout();
+  clearCart();
+  showToast(`Order ${order.id} placed! Opening WhatsApp… 🎉`, 'success');
+
+  setTimeout(() => {
+    const waUrl = `https://wa.me/${OWNER_WHATSAPP}?text=${encodeURIComponent(message)}`;
+    window.open(waUrl, '_blank');
+  }, 350);
 }
 
 // Close modal on overlay click
